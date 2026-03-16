@@ -1,0 +1,139 @@
+/* 1. ĐỊNH NGHĨA BIẾN MÀU SẮC THƯƠNG HIỆU FAMILYMART */
+:root {
+    --fm-blue: #0080C0;     /* Xanh dương FamilyMart */
+    --fm-green: #00AB4E;    /* Xanh lá FamilyMart */
+    --fm-light-gray: #F3F4F6;
+    --fm-dark: #1F2937;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 2. CÀI ĐẶT CHUNG */
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--fm-dark);
+}
+
+/* Tùy chỉnh thanh cuộn cho đẹp */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--fm-blue);
+    border-radius: 10px;
+}
+
+/* 3. HIỆU ỨNG MODAL */
+.modal-animate {
+    animation: modalShow 0.4s ease-out;
+}
+
+@keyframes modalShow {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 4. ĐỊNH DẠNG NÚT BẤM (BUTTONS) */
+.btn-primary {
+    background-color: var(--fm-blue);
+    transition: var(--transition);
+}
+
+.btn-primary:hover {
+    background-color: #005f91;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 128, 192, 0.3);
+}
+
+.btn-success {
+    background-color: var(--fm-green);
+    transition: var(--transition);
+}
+
+.btn-success:hover {
+    background-color: #008a3f;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 171, 78, 0.3);
+}
+
+/* 5. ĐỊNH DẠNG TRANG MANAGER (BẢNG DỮ LIỆU) */
+.tab-content {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Style cho các dòng trong bảng duyệt nhân viên */
+#stalk-list tr {
+    transition: var(--transition);
+}
+
+#stalk-list tr:hover {
+    background-color: #f9fafb;
+    transform: scale(1.005);
+}
+
+/* 6. CARD SẢN PHẨM TRANG POS */
+.product-card {
+    border: 2px solid transparent;
+    transition: var(--transition);
+}
+
+.product-card:hover {
+    border-color: var(--fm-green);
+    transform: translateY(-5px);
+}
+
+/* 7. NÚT CHỌN SIZE (TRANG CHI TIẾT) */
+.size-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.size-btn.active-size {
+    border-color: var(--fm-blue);
+    background-color: #ebf8ff;
+    color: var(--fm-blue);
+}
+
+.size-btn.active-size::after {
+    content: '\f058'; /* Icon Check của FontAwesome */
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 10px;
+}
+
+/* 8. ĐĂNG NHẬP & TUYỂN DỤNG */
+input:focus, textarea:focus, select:focus {
+    box-shadow: 0 0 0 3px rgba(0, 128, 192, 0.2);
+    border-color: var(--fm-blue);
+}
+
+#recruitmentForm input, #recruitmentForm select, #recruitmentForm textarea {
+    border-radius: 12px;
+}
+
+/* 9. RESPONSIVE MAP */
+@media (max-width: 768px) {
+    .lg\:w-2\/3 {
+        height: 300px;
+    }
+}
