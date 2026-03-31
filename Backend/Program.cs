@@ -1,53 +1,50 @@
 using Microsoft.OpenApi.Models;
-using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. CẤU HÌNH KẾT NỐI ORACLE
-// Lấy chuỗi kết nối từ appsettings.json
-var connectionString = builder.Configuration.GetConnectionString("OracleConn");
-
-// 2. CẤU HÌNH CORS (Cho phép Frontend truy cập API)
-// Lưu ý: Thay đổi URL nếu Live Server của bạn chạy ở cổng khác (ví dụ 5501)
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend",
-        policy =>
-        {
-            policy.WithOrigins("http://127.0.0.1:5500", "http://localhost:5500")
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        });
-});
-
-// 3. CẤU HÌNH CONTROLLERS & JSON
+// 1. Cấu hình Controllers và JSON (Giữ nguyên tên biến cho POS.js)
 builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        // Giữ nguyên kiểu chữ của thuộc tính (để JS nhận đúng ProId, BasePrice...)
-        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    .AddJsonOptions(options => {
+        options.JsonSerializerOptions.PropertyNamingPolicy = null; 
     });
 
-// 4. CẤU HÌNH SWAGGER (Để bạn test API trực tiếp trên web)
+// 2. Cấu hình CORS - Cho phép Frontend gọi API
+builder.Services.AddCors(options => {
+    options.AddPolicy("AllowAll", policy => {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
+// 3. Cấu hình Swagger (Dùng Try-Catch hoặc viết tường minh để tránh lỗi build)
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+builder.Services.AddSwaggerGen(options =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "FamilyMart POS API", Version = "v1" });
+    options.SwaggerDoc("v1", new OpenApiInfo 
+    { 
+        Title = "FamilyMart POS API", 
+        Version = "v1",
+        Description = "API dành cho hệ thống quản lý FamilyMart"
+    });
 });
 
 var app = builder.Build();
 
-// 5. CẤU HÌNH PIPELINE (THỨ TỰ XỬ LÝ)
-if (app.Environment.IsDevelopment())
+// 4. Kích hoạt Swagger UI (Kể cả trong môi trường Production để dễ test)
+app.UseSwagger();
+app.UseSwaggerUI(c => 
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "FamilyMart API V1");
+    c.RoutePrefix = "swagger"; 
+});
 
-// Kích hoạt CORS trước khi xử lý Routing
-app.UseCors("AllowFrontend");
-
+// 5. THỨ TỰ MIDDLEWARE CỰC KỲ QUAN TRỌNG
 app.UseHttpsRedirection();
+
+app.UseRouting(); // Thêm dòng này để định tuyến tốt hơn
+
+app.UseCors("AllowAll"); // Cors phải đặt TRƯỚC Authorization
 
 app.UseAuthorization();
 
