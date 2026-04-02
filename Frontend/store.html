@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FamilyMart - Chọn Chi Nhánh</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .animate-pop-in { animation: popIn 0.4s ease-out; }
+        @keyframes popIn {
+            0% { transform: scale(0.95); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-[#0080C0] h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-[30px] p-10 w-full max-w-md shadow-2xl text-center animate-pop-in">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/FamilyMart_Logo.svg/1200px-FamilyMart_Logo.svg.png" 
+             class="h-12 mx-auto mb-8" alt="Logo">
+        
+        <h2 class="text-xl font-black text-gray-700 uppercase mb-2 tracking-wide">Hệ Thống Bán Hàng</h2>
+        <p class="text-gray-400 text-sm mb-8 font-medium">Vui lòng chọn chi nhánh làm việc</p>
+        
+        <div class="text-left mb-8">
+            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 px-1">Danh sách chi nhánh</label>
+            <div class="relative">
+                <select id="storeSelect" class="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[#0080C0] font-bold text-gray-700 appearance-none transition-all">
+                    <option value="" disabled selected>Đang tải dữ liệu từ API...</option>
+                </select>
+                <i class="fa fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+            </div>
+        </div>
+        
+        <button onclick="handleLogin()" class="w-full bg-[#46c11b] hover:bg-green-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg transition-all active:scale-95 uppercase flex justify-center items-center gap-2">
+            <i class="fa fa-sign-in-alt"></i> Vào hệ thống
+        </button>
+    </div>
+
+    <script>
+        // Cấu hình địa chỉ API của bạn
+        const API_STORE_URL = "http://localhost:3000/api/Store/get-all";
+
+        // 1. Gọi API lấy danh sách chi nhánh ngay khi trang load
+        window.onload = async () => {
+            try {
+                const response = await fetch(API_STORE_URL);
+                if (!response.ok) throw new Error("Không thể kết nối API");
+                
+                const stores = await response.json();
+                const storeSelect = document.getElementById('storeSelect');
+                
+                storeSelect.innerHTML = '<option value="" disabled selected>-- Chọn chi nhánh của bạn --</option>';
+                stores.forEach(s => {
+                    // Giả định API trả về StoreId và StoreName
+                    storeSelect.innerHTML += `<option value="${s.storeId}" data-name="${s.storeName}">${s.storeName}</option>`;
+                });
+            } catch (error) {
+                console.error("Lỗi:", error);
+                document.getElementById('storeSelect').innerHTML = '<option value="" disabled>Lỗi kết nối API Database</option>';
+                alert("Không thể tải danh sách chi nhánh. Hãy chắc chắn Backend đang chạy!");
+            }
+        };
+
+        // 2. Xử lý khi bấm nút vào hệ thống
+        function handleLogin() {
+            const select = document.getElementById('storeSelect');
+            const selectedOption = select.options[select.selectedIndex];
+            
+            if (!select.value) {
+                return alert("Vui lòng chọn một chi nhánh!");
+            }
+
+            // Lưu thông tin vào trình duyệt để trang pos.html lấy ra dùng
+            localStorage.setItem('selectedStoreId', select.value);
+            localStorage.setItem('selectedStoreName', selectedOption.getAttribute('data-name'));
+
+            // Chuyển trang
+            window.location.href = "pos.html";
+        }
+    </script>
+</body>
+</html>

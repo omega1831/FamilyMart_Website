@@ -1,105 +1,126 @@
-/**
- * AUTH.JS - Quản lý xác thực và phân quyền FamilyMart
- * Kết nối: Frontend -> Backend (ASP.NET) -> DB (Oracle)
- */
 
+class Store {
+    constructor(data) {
+     
+        this.id = data.storeid || data.storeId;
+        this.name = data.storename || data.storeName;
+    }
+
+    // Tạo HTML cho option trong dropdown
+    renderOption() {
+        return `<option value="${this.id}" data-name="${this.name}">${this.name}</option>`;
+    }
+}
+
+// 2. CẤU HÌNH & TRẠNG THÁI
 const AUTH_CONFIG = {
-    // Thay đổi URL này trùng với địa chỉ chạy Backend ASP.NET của bạn
-    BASE_URL: "https://localhost:5001/api/Auth", 
-    LOGIN_PAGE: "login.html",
-    INDEX_PAGE: "index.html",
-    ADMIN_PAGE: "manager.html"
+    BASE_URL: "https://unpatinated-unmelodized-monique.ngrok-free.dev",
+    STORE_PAGE: "store.html",
+    POS_PAGE: "pos.html"
 };
 
-// 1. HÀM ĐĂNG NHẬP (Gửi Email/Pass lên Backend)
-async function login(email, password) {
+const authState = {
+    stores: []
+};
+
+// 3. HÀM LẤY DANH SÁCH CHI NHÁNH
+async function fetchStores() {
+    const storeSelect = document.getElementById('storeSelect');
+    if (!storeSelect) return;
+
     try {
-        const response = await fetch(`${AUTH_CONFIG.BASE_URL}/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+        const response = await fetch(`${AUTH_CONFIG.BASE_URL}/api/store/get-all`, {
+            method: 'GET',
+            headers: {
+                'ngrok-skip-browser-warning': 'true', 
+                'Content-Type': 'application/json'
+            }
         });
 
-        const data = await response.json();
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-        if (response.ok) {
-            // Lưu thông tin lấy từ Oracle vào SessionStorage
-            sessionStorage.setItem('isLoggedIn', 'true');
-            sessionStorage.setItem('userToken', data.token); // JWT Token nếu có
-            sessionStorage.setItem('userRole', data.role);   // Lấy từ cột ROLE trong DB
-            sessionStorage.setItem('userName', data.fullName);
-            sessionStorage.setItem('userEmail', email);
+        const rawData = await response.json();
+        
+        // PARSE DỮ LIỆU SANG MODEL
+        authState.stores = rawData.map(item => new Store(item));
 
-            return { success: true, role: data.role };
-        } else {
-            return { success: false, message: data.message || "Sai thông tin đăng nhập!" };
-        }
+        // HIỂN THỊ LÊN UI
+        storeSelect.innerHTML = '<option value="" disabled selected>-- Chọn chi nhánh làm việc --</option>';
+        storeSelect.innerHTML += authState.stores.map(s => s.renderOption()).join('');
+
     } catch (error) {
-        console.error("Auth Error:", error);
-        return { success: false, message: "Không thể kết nối tới máy chủ!" };
+        console.error("Lỗi khi lấy danh sách Store:", error);
+   
+        loadMockStores();
     }
 }
 
-// 2. HÀM ĐĂNG XUẤT
-function logout() {
-    sessionStorage.clear(); // Xóa sạch dấu vết đăng nhập
-    window.location.href = AUTH_CONFIG.LOGIN_PAGE;
+// 4. HÀM XÁC NHẬN CHỌN STORE (LOGIN)
+function loginToStore() {
+    const select = document.getElementById('storeSelect');
+    if (!select || !select.value) {
+        alert("Vui lòng chọn một chi nhánh để bắt đầu!");
+        return;
+    }
+
+    const selectedOption = select.options[select.selectedIndex];
+    const storeId = select.value;
+    const storeName = selectedOption.getAttribute('data-name');
+
+    // Lưu vào localStorage (Đồng bộ với pos.js)
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('selectedStoreId', storeId);
+    localStorage.setItem('selectedStoreName', storeName);
+
+    // Chuyển sang trang POS
+    window.location.href = AUTH_CONFIG.POS_PAGE;
 }
 
-// 3. KIỂM TRA QUYỀN TRUY CẬP (Bảo vệ các trang Manager)
+// 5. KIỂM TRA QUYỀN TRUY CẬP
 function checkAccess() {
-    const isLoggedIn = sessionStorage.getItem('isLoggedIn');
-    const userRole = sessionStorage.getItem('userRole');
-    const currentPage = window.location.pathname.split("/").pop();
+    const isLoggedIn = localStorage.getItem('isLoggedIn');
+    const path = window.location.pathname;
+    
+    // Kiểm tra xem đang ở trang nào dựa trên tên file trong URL
+    const isAtPos = path.includes(AUTH_CONFIG.POS_PAGE);
+    const isAtStore = path.includes(AUTH_CONFIG.STORE_PAGE) || path.endsWith('/');
 
-    // Nếu cố tình vào manager.html mà không phải Manager
-    if (currentPage === AUTH_CONFIG.ADMIN_PAGE) {
-        if (!isLoggedIn || userRole !== 'Manager') {
-            alert("⚠️ Cảnh báo: Bạn không có quyền truy cập khu vực quản trị!");
-            window.location.href = AUTH_CONFIG.INDEX_PAGE;
-        }
+    if (isAtPos && !isLoggedIn) {
+        window.location.href = AUTH_CONFIG.STORE_PAGE;
     }
     
-    // Nếu đã đăng nhập mà vẫn cố vào trang login.html
-    if (currentPage === AUTH_CONFIG.LOGIN_PAGE && isLoggedIn) {
-        window.location.href = AUTH_CONFIG.INDEX_PAGE;
+    if (isAtStore && isLoggedIn) {
+        window.location.href = AUTH_CONFIG.POS_PAGE;
     }
 }
 
-// 4. CẬP NHẬT GIAO DIỆN DỰA TRÊN LOGIN (Ẩn/Hiện nút)
-function updateUIBasedOnAuth() {
-    const authArea = document.getElementById('authArea');
-    if (!authArea) return;
-
-    const isLoggedIn = sessionStorage.getItem('isLoggedIn');
-    const userName = sessionStorage.getItem('userName');
-    const userRole = sessionStorage.getItem('userRole');
-
-    if (isLoggedIn) {
-        authArea.innerHTML = `
-            <div class="flex items-center space-x-4">
-                <div class="text-right hidden sm:block">
-                    <p class="text-xs font-bold uppercase tracking-tighter text-white opacity-80">${userRole}</p>
-                    <p class="text-sm font-black text-white">${userName}</p>
-                </div>
-                <div class="relative group">
-                    <button class="w-10 h-10 bg-white text-[#0080C0] rounded-full flex items-center justify-center shadow-lg">
-                        <i class="fa fa-user"></i>
-                    </button>
-                    <div class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl py-2 hidden group-hover:block border animate-fade-in">
-                        ${userRole === 'Manager' ? `<a href="manager.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-bold"><i class="fa fa-tasks mr-2"></i>Quản trị</a>` : ''}
-                        <button onclick="logout()" class="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-bold">
-                            <i class="fa fa-sign-out-alt mr-2"></i>Đăng xuất
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
+// 6. ĐĂNG XUẤT (LOGOUT)
+function logout() {
+    if (confirm("Bạn có chắc chắn muốn thoát ca và đổi chi nhánh không?")) {
+        localStorage.clear();
+        window.location.href = AUTH_CONFIG.STORE_PAGE;
     }
 }
 
-// Tự động chạy kiểm tra khi nạp file JS
+// KHỞI CHẠY TỰ ĐỘNG
 document.addEventListener('DOMContentLoaded', () => {
+    const path = window.location.pathname;
+    
+    // Nếu đang ở trang chọn store thì mới load danh sách
+    if (path.includes(AUTH_CONFIG.STORE_PAGE) || path.endsWith('/') || path.includes('index.html')) {
+        fetchStores();
+    }
+    
     checkAccess();
-    updateUIBasedOnAuth();
 });
+
+// DỮ LIỆU GIẢ (BACKUP)
+function loadMockStores() {
+    const storeSelect = document.getElementById('storeSelect');
+    const mockData = [
+        new Store({ storeid: "MOCK01", storename: "Family Mart Lê Thánh Tôn (Dữ liệu Test)" }),
+        new Store({ storeid: "MOCK02", storename: "Family Mart Nguyễn Hữu Cảnh (Dữ liệu Test)" })
+    ];
+    storeSelect.innerHTML = '<option value="" disabled selected>-- API Lỗi - Chọn tạm Store Test --</option>';
+    storeSelect.innerHTML += mockData.map(s => s.renderOption()).join('');
+}
