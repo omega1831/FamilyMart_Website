@@ -1,170 +1,191 @@
-/**
- * POS.JS - Logic Bán Hàng & Xử Lý Sản Phẩm FamilyMart
- * Quy trình: Fetch API -> Render UI -> Modal Detail (Change Size) -> Add to Cart
- */
+// ==========================================
+// 1. MODEL - CHUYỂN ĐỔI DỮ LIỆU TỪ API
+// ==========================================
+class Product {
+    constructor(data) {
+        // Parse dữ liệu từ API 
+        this.id = data.productid;
+        this.name = data.productname;
+        this.category = data.categoryName || "Khác";
+        this.supplier = data.supplierName || "Family Mart";
+     
+    }
 
-const POS_CONFIG = {
-    // URL API từ ASP.NET kết nối Oracle
-    PRODUCT_API: "https://localhost:5001/api/Product",
-    ORDER_API: "https://localhost:5001/api/Order"
-};
-
-let allProducts = []; // Lưu trữ danh sách sản phẩm lấy từ DB
-let currentSelectedProduct = null; // Sản phẩm đang xem trong Modal
-
-// 1. HÀM LẤY DỮ LIỆU TỪ BACKEND (FRONTEND -> BACKEND -> ORACLE)
-async function fetchProducts() {
-    try {
-        const response = await fetch(POS_CONFIG.PRODUCT_API);
-        if (response.ok) {
-            allProducts = await response.json();
-            renderProductGrid(allProducts);
-        } else {
-            console.error("Lỗi lấy dữ liệu từ Oracle");
-            // Mock dữ liệu giả nếu API chưa sẵn sàng để bạn test UI
-            loadMockData(); 
-        }
-    } catch (error) {
-        console.warn("Chưa kết nối được API Backend, đang dùng dữ liệu giả để test UI.");
-        loadMockData();
+    // Hàm tạo mã HTML cho từng sản phẩm 
+    renderCard() {
+        return `
+            <div onclick="addToCartById('${this.id}')" 
+                 class="product-card bg-white p-4 rounded-2xl shadow-sm border border-transparent hover:border-[#0080C0] cursor-pointer transition-all flex flex-col items-center text-center">
+                <div class="w-full aspect-square bg-gray-50 rounded-xl mb-3 flex items-center justify-center text-gray-400">
+                    <i class="fa fa-shopping-basket text-3xl"></i>
+                </div>
+                <h3 class="font-bold text-gray-700 text-xs h-8 overflow-hidden mb-1">${this.name}</h3>
+                <p class="text-[10px] text-gray-400 mb-1 uppercase">${this.category}</p>
+                <p class="text-[#0080C0] font-black">${this.price.toLocaleString()}đ</p>
+            </div>
+        `;
     }
 }
 
-// 2. HIỂN THỊ DANH SÁCH SẢN PHẨM LÊN GIAO DIỆN
+// ==========================================
+// 2. STATE - QUẢN LÝ TRẠNG THÁI HỆ THỐNG
+// ==========================================
+const state = {
+    allProducts: [], // Chứa các đối tượng Product (Model)
+    cart: [],
+    totalRemaining: 0,
+    apiUrl: "https://unpatinated-unmelodized-monique.ngrok-free.dev/api/product/get-all"
+};
+
+// ==========================================
+// 3. KHỞI TẠO & GỌI API
+// ==========================================
+window.onload = async () => {
+    const storeName = localStorage.getItem('selectedStoreName') || "Chi nhánh Family Mart";
+    document.getElementById('currentStoreName').textContent = storeName;
+    await fetchProducts();
+};
+
+async function fetchProducts() {
+    try {
+        const response = await fetch(state.apiUrl, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        if (!response.ok) throw new Error("API Connection Failed");
+
+        const rawData = await response.json();
+
+        // CHUYỂN DỮ LIỆU THÔ SANG MODEL (PARSE DATA)
+        state.allProducts = rawData.map(item => new Product(item));
+
+        renderCategoryButtons();
+        renderProductGrid(state.allProducts);
+    } catch (error) {
+        console.error("Lỗi tải sản phẩm:", error);
+        alert("Không thể kết nối API của nhóm trưởng!");
+    }
+}
+
+// ==========================================
+// 4. HIỂN THỊ GIAO DIỆN (UI RENDERING)
+// ==========================================
 function renderProductGrid(products) {
     const grid = document.getElementById('productGrid');
-    if (!grid) return;
+    grid.innerHTML = products.map(p => p.renderCard()).join('');
+}
 
-    grid.innerHTML = products.map(p => `
-        <div class="bg-white rounded-[2rem] p-5 shadow-lg border-2 border-transparent hover:border-[#00AB4E] transition-all group overflow-hidden">
-            <div class="relative overflow-hidden rounded-2xl mb-4">
-                <img src="${p.img}" class="w-full h-48 object-cover group-hover:scale-110 transition duration-500">
-                <div class="absolute top-2 right-2 bg-white/90 px-3 py-1 rounded-full text-[10px] font-black text-[#0080C0] shadow-sm">
-                    ID: ${p.id}
-                </div>
-            </div>
-            <h4 class="font-black text-xl text-gray-800 mb-1 leading-tight h-14 overflow-hidden">${p.name}</h4>
-            <p class="text-[#0080C0] font-black text-lg">${p.basePrice.toLocaleString()}đ</p>
-            
-            <button onclick="viewProductDetail('${p.id}')" 
-                    class="mt-5 w-full py-4 bg-[#00AB4E] text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-green-600 transition active:scale-95">
-                XEM CHI TIẾT
-            </button>
-        </div>
+function renderCategoryButtons() {
+    const container = document.getElementById('categoryContainer');
+    const categories = ['Tất cả', ...new Set(state.allProducts.map(p => p.category))];
+    
+    container.innerHTML = categories.map(cat => `
+        <button onclick="filterByCategory('${cat}', this)" 
+                class="cat-btn ${cat === 'Tất cả' ? 'active' : ''} px-6 py-2.5 rounded-xl font-bold bg-white border transition-all">
+            ${cat}
+        </button>
     `).join('');
 }
 
-// 3. LOGIC XEM CHI TIẾT & CHỌN SIZE (NHẢY GIÁ)
-window.viewProductDetail = (productId) => {
-    currentSelectedProduct = allProducts.find(p => p.id === productId);
-    const content = document.getElementById('detailContent');
+function filterByCategory(catName, btn) {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
     
-    // Tạo giao diện Modal
-    content.innerHTML = `
-        <div class="space-y-6">
-            <img src="${currentSelectedProduct.img}" class="w-full h-64 object-cover rounded-3xl shadow-md">
-            
-            <div>
-                <h2 class="text-3xl font-black text-[#0080C0]">${currentSelectedProduct.name}</h2>
-                <p class="text-gray-400 text-sm mt-2 leading-relaxed">${currentSelectedProduct.desc || 'Sản phẩm tươi ngon mỗi ngày từ FamilyMart.'}</p>
-            </div>
-
-            <div class="bg-gray-50 p-4 rounded-2xl">
-                <label class="block text-[10px] font-black uppercase text-gray-400 mb-4 tracking-[0.2em] text-center italic">Chọn kích cỡ (Size)</label>
-                <div class="grid grid-cols-2 gap-3" id="sizeOptions">
-                    ${Object.keys(currentSelectedProduct.sizes).map(sizeName => `
-                        <button onclick="updatePriceLogic('${sizeName}')" 
-                                id="size-${sizeName}"
-                                class="size-btn p-4 border-2 bg-white rounded-2xl font-bold transition-all flex justify-between items-center border-gray-100 hover:border-[#0080C0]">
-                            <span class="text-sm">${sizeName}</span>
-                            <span class="text-[10px] text-[#00AB4E]">+${currentSelectedProduct.sizes[sizeName].toLocaleString()}đ</span>
-                        </button>
-                    `).join('')}
-                </div>
-            </div>
-
-            <div class="flex items-center justify-between pt-4 border-t border-dashed">
-                <div>
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Giá tạm tính</p>
-                    <h3 id="modalDisplayPrice" class="text-3xl font-black text-[#00AB4E]">${currentSelectedProduct.basePrice.toLocaleString()}đ</h3>
-                </div>
-                <button onclick="addToCartLogic()" class="bg-[#0080C0] text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition active:scale-95">
-                    MUA NGAY
-                </button>
-            </div>
-        </div>
-    `;
-    
-    openModal('detailModal');
-    // Mặc định chọn size đầu tiên
-    const firstSize = Object.keys(currentSelectedProduct.sizes)[0];
-    updatePriceLogic(firstSize);
-};
-
-// 4. HÀM CẬP NHẬT GIÁ KHI ĐỔI SIZE (NHƯ TRANG FAMILYMART.COM)
-window.updatePriceLogic = (sizeName) => {
-    const extraPrice = currentSelectedProduct.sizes[sizeName];
-    const finalPrice = currentSelectedProduct.basePrice + extraPrice;
-    
-    // Hiệu ứng nhảy số tiền
-    document.getElementById('modalDisplayPrice').innerText = finalPrice.toLocaleString() + "đ";
-    
-    // Cập nhật trạng thái nút (UI)
-    document.querySelectorAll('.size-btn').forEach(btn => {
-        btn.classList.remove('border-[#0080C0]', 'bg-blue-50', 'text-[#0080C0]');
-        btn.classList.add('border-gray-100', 'bg-white');
-    });
-    
-    const activeBtn = document.getElementById(`size-${sizeName}`);
-    activeBtn.classList.remove('border-gray-100', 'bg-white');
-    activeBtn.classList.add('border-[#0080C0]', 'bg-blue-50', 'text-[#0080C0]');
-    
-    // Lưu size đang chọn vào biến tạm của sản phẩm
-    currentSelectedProduct.selectedSize = sizeName;
-    currentSelectedProduct.currentPrice = finalPrice;
-};
-
-// 5. GỬI ĐƠN HÀNG VỀ BACKEND (ORACLE)
-async function addToCartLogic() {
-    const orderData = {
-        productId: currentSelectedProduct.id,
-        size: currentSelectedProduct.selectedSize,
-        total: currentSelectedProduct.currentPrice,
-        orderDate: new Date().toISOString(),
-        staffEmail: sessionStorage.getItem('userEmail')
-    };
-
-    console.log("Đang gửi đơn hàng về Oracle:", orderData);
-    
-    // Giao diện thông báo
-    alert(`Đã thêm vào giỏ: ${currentSelectedProduct.name} (${orderData.size}) - ${orderData.total.toLocaleString()}đ`);
-    closeModal('detailModal');
+    const filtered = (catName === 'Tất cả') 
+        ? state.allProducts 
+        : state.allProducts.filter(p => p.category === catName);
+    renderProductGrid(filtered);
 }
 
-// DỮ LIỆU GIẢ ĐỂ TEST KHI CHƯA CÓ BACKEND
-function loadMockData() {
-    allProducts = [
-        { 
-            id: "F01", name: "Lẩu Ly Oden", basePrice: 25000, 
-            img: "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=500",
-            sizes: { "S": 0, "M": 5000, "L": 10000 },
-            desc: "Nước dùng Oden thanh ngọt chuẩn vị Nhật, ăn kèm các loại cá viên tươi ngon."
-        },
-        { 
-            id: "D02", name: "Cà Phê Sữa Đá", basePrice: 18000, 
-            img: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=500",
-            sizes: { "Vừa": 0, "Lớn": 7000 },
-            desc: "Hạt cà phê rang xay nguyên chất pha phin truyền thống."
-        },
-        { 
-            id: "F03", name: "Cơm Trứng Quốc Gia", basePrice: 15000, 
-            img: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500",
-            sizes: { "Thường": 0, "Thêm trứng": 5000, "Thêm cơm": 3000 },
-            desc: "Bữa cơm tiện lợi nhanh chóng, đầy đủ dinh dưỡng cho ngày mới."
-        }
-    ];
-    renderProductGrid(allProducts);
+// ==========================================
+// 5. GIỎ HÀNG & THANH TOÁN (LOGIC)
+// ==========================================
+function addToCartById(id) {
+    const product = state.allProducts.find(p => p.id === id);
+    if (!product) return;
+
+    const itemInCart = state.cart.find(item => item.id === id);
+    if (itemInCart) {
+        itemInCart.sl++;
+    } else {
+        state.cart.push({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            sl: 1
+        });
+    }
+    updateCartUI();
 }
 
-// Khởi chạy khi tải trang
-document.addEventListener('DOMContentLoaded', fetchProducts);
+function changeQty(id, delta) {
+    const item = state.cart.find(i => i.id === id);
+    if (item) {
+        item.sl += delta;
+        if (item.sl <= 0) state.cart = state.cart.filter(i => i.id !== id);
+        updateCartUI();
+    }
+}
+
+function updateCartUI() {
+    const body = document.getElementById('cartBody');
+    const empty = document.getElementById('emptyCart');
+    
+    if (state.cart.length === 0) {
+        body.innerHTML = "";
+        empty.style.display = "block";
+        state.totalRemaining = 0;
+    } else {
+        empty.style.display = "none";
+        let total = 0;
+        body.innerHTML = state.cart.map(item => {
+            const subtotal = item.price * item.sl;
+            total += subtotal;
+            return `
+                <tr class="border-b">
+                    <td class="py-4 font-bold text-gray-700">${item.name}</td>
+                    <td class="py-4 text-center">
+                        <div class="flex items-center justify-center gap-2">
+                            <button onclick="changeQty('${item.id}', -1)" class="w-6 h-6 border rounded-full hover:bg-red-50">-</button>
+                            <span class="font-black">${item.sl}</span>
+                            <button onclick="changeQty('${item.id}', 1)" class="w-6 h-6 border rounded-full hover:bg-green-50">+</button>
+                        </div>
+                    </td>
+                    <td class="py-4 text-right font-black text-[#0080C0]">${subtotal.toLocaleString()}đ</td>
+                </tr>
+            `;
+        }).join('');
+        state.totalRemaining = total;
+    }
+    
+    document.getElementById('totalDisplay').textContent = state.totalRemaining.toLocaleString();
+    document.getElementById('payAmount').value = state.totalRemaining; 
+}
+
+// THANH TOÁN D2 (TRỪ DẦN)
+function confirmPartial() {
+    const payInput = document.getElementById('payAmount');
+    const amountPaid = parseInt(payInput.value) || 0;
+
+    if (amountPaid <= 0) return alert("Vui lòng nhập số tiền!");
+
+    state.totalRemaining = Math.max(0, state.totalRemaining - amountPaid);
+    
+    alert(`Đã nhận ${amountPaid.toLocaleString()}đ. Còn lại: ${state.totalRemaining.toLocaleString()}đ`);
+    document.getElementById('totalDisplay').textContent = state.totalRemaining.toLocaleString();
+    document.getElementById('payAmount').value = state.totalRemaining;
+}
+
+async function processPayment() {
+    if (state.cart.length === 0) return alert("Giỏ hàng trống!");
+    if (state.totalRemaining > 0) return alert("Chưa thu đủ tiền!");
+
+    alert("Thanh toán thành công!");
+    state.cart = [];
+    updateCartUI();
+}
+
+function handleSearch(val) {
+    const term = val.toLowerCase();
+    const filtered = state.allProducts.filter(p => p.name.toLowerCase().includes(term));
+    renderProductGrid(filtered);
+}
