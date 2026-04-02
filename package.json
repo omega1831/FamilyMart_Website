@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "name": "familymart",
   "version": "1.0.0",
@@ -21,4 +22,29 @@
     "mongoose": "^8.4.0",
     "path": "^0.12.7"
   }
+=======
+{
+  "name": "familymart",
+  "version": "1.0.0",
+  "description": "Do an quan ly chuoi cua hang FamilyMart - HUFLIT",
+  "main": "server.js",
+"scripts": {
+  "start": "node server.js",
+  "dev": "nodemon server.js" 
+},
+  "keywords": [
+    "nodejs",
+    "mongodb",
+    "familymart"
+  ],cd Backend
+  "author": "Phong(Ali Bushari)",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.4.0",
+    "path": "^0.12.7"
+  }
+>>>>>>> 06f4a0b (Initial commit - FamilyMart Project Base)
 }
